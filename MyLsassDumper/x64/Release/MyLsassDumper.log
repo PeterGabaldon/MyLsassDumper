@@ -1,7 +1,0 @@
-﻿  dllmain.cpp
-     Creating library C:\Users\pedro.gabaldon\MyLsassDumper\x64\Release\MyLsassDumper.lib and object C:\Users\pedro.gabaldon\MyLsassDumper\x64\Release\MyLsassDumper.exp
-  Generating code
-  Previous IPDB not found, fall back to full compilation.
-  All 10 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  Finished generating code
-  MyLsassDumper.vcxproj -> C:\Users\pedro.gabaldon\MyLsassDumper\x64\Release\MyLsassDumper.dll
